@@ -13,7 +13,7 @@ jobs:
   release:
     name: Release
     runs-on: windows-latest
-    if: ${{ github.ref == 'refs/heads/dev' }}
+    if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,6 +39,12 @@ jobs:
             ~/.cargo/git/db/
             src-tauri/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+      - name: Cache Tauri Bundler Tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/AppData/Local/tauri/
+          key: ${{ runner.os }}-tauri-bundler-${{ hashFiles('src-tauri/tauri.conf.json') }}
       - name: Install dependencies
         run: pnpm i
       - name: Bump version
