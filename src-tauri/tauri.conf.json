@@ -40,7 +40,7 @@
             "args": true
           },
           {
-            "name": "binaries/aria2c",
+            "name": "binaries/gopeed-web",
             "sidecar": true,
             "args": true
           }
@@ -68,7 +68,7 @@
         "icons/icon.ico"
       ],
       "externalBin": [
-        "binaries/aria2c"
+        "binaries/gopeed-web"
       ]
     },
     "security": {

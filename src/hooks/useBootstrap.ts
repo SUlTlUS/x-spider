@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { aria2 } from '../utils/aria2';
+import { downloadEngine } from '../utils/downloader';
 
 export function useBootstrap() {
   const [ready, setReady] = useState(false);
@@ -13,13 +13,13 @@ export function useBootstrap() {
       }
       const flows: BootConfig[] = [
         {
-          name: 'aria',
+          name: 'download',
           async fn() {
             try {
-              await aria2.bootstrap();
+              await downloadEngine.bootstrap();
             } catch (err) {
               log.error(err);
-              throw new Error('启动 Aria 失败 ');
+              throw new Error('启动下载引擎失败');
             }
           },
         },

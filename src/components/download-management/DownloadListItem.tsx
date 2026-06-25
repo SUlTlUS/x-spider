@@ -29,6 +29,12 @@ export const DownloadListItem: React.FC<DownloadListItemProps> = ({
   itemClientHeight,
 }) => {
   const { message } = App.useApp();
+  const progressPercent =
+    Number.isFinite(t.totalSize) && t.totalSize > 0
+      ? Math.round((t.completeSize / t.totalSize) * 100)
+      : t.status === 'complete'
+        ? 100
+        : 0;
   const {
     removeDownloadTask,
     pauseDownloadTask,
@@ -196,10 +202,7 @@ export const DownloadListItem: React.FC<DownloadListItemProps> = ({
           />
         </div>
         <div className="mt-0">
-          <Progress
-            percent={Math.round((t.completeSize / t.totalSize) * 100)}
-            className="mb-0 mr-0"
-          />
+          <Progress percent={progressPercent} className="mb-0 mr-0" />
         </div>
         <div>
           <StatusText task={t} />

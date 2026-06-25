@@ -8,7 +8,7 @@ import { DownloadTask } from '../interfaces/DownloadTask';
 import { TwitterMedia } from '../interfaces/TwitterMedia';
 import { TwitterPost } from '../interfaces/TwitterPost';
 import { TwitterUser } from '../interfaces/TwitterUser';
-import { AriaStatus, aria2 } from '../utils/aria2';
+import { DownloadStatus, downloadEngine } from '../utils/downloader';
 import { getUserMedias, getUserTweets } from '../twitter/api';
 import { useSettingsStore } from './settings';
 import { getDownloadUrl } from '../twitter/utils';
@@ -30,20 +30,20 @@ export interface CreateDownloadTaskParams {
   media: TwitterMedia;
 }
 
-async function mergeAriaStatusToDownloadTask(
-  ariaStatus: any,
+async function mergeDownloadStatusToDownloadTask(
+  downloadStatus: any,
   oldTask: DownloadTask,
   now = Date.now(),
 ): Promise<DownloadTask> {
   return {
     ...oldTask,
-    gid: ariaStatus.gid,
-    status: ariaStatus.status,
-    completeSize: Number(ariaStatus.completedLength),
-    totalSize: Number(ariaStatus.totalLength),
-    fileName: await path.basename(ariaStatus.files[0].path),
-    error: ariaStatus.errorMessage,
-    dir: ariaStatus.dir,
+    gid: downloadStatus.gid,
+    status: downloadStatus.status,
+    completeSize: Number(downloadStatus.completedLength),
+    totalSize: Number(downloadStatus.totalLength),
+    fileName: await path.basename(downloadStatus.files[0].path),
+    error: downloadStatus.errorMessage,
+    dir: downloadStatus.dir,
     updatedAt: now,
   };
 }
@@ -75,7 +75,7 @@ async function prepareDownloadTask({
 
   const task: DownloadTask = {
     gid: '',
-    status: AriaStatus.Waiting,
+    status: DownloadStatus.Waiting,
     completeSize: 0,
     totalSize: Infinity,
     fileName,
@@ -85,7 +85,7 @@ async function prepareDownloadTask({
     dir,
     updatedAt: Date.now(),
     downloadUrl,
-    ariaRetryCountRemains: 5,
+    downloadRetryCountRemains: 5,
   };
 
   return task;
@@ -133,13 +133,13 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
   createDownloadTask: async (params) => {
     const task = await prepareDownloadTask(params);
 
-    const gid = await aria2.invoke('aria2.addUri', [task.downloadUrl], {
+    const gid = await downloadEngine.addUri(task.downloadUrl, {
       dir: task.dir,
       out: task.fileName,
     });
     task.gid = gid;
 
-    const status = await aria2.tellStatus(task.gid);
+    const status = await downloadEngine.tellStatus(task.gid);
     task.status = status.status;
 
     set({
@@ -196,21 +196,18 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
     }
 
     const gids: string[] = (
-      await aria2.batchInvoke(
+      await downloadEngine.batchAddUri(
         tasks.map((task) => ({
-          methodName: 'aria2.addUri',
-          params: [
-            [task.downloadUrl],
-            {
-              dir: task.dir,
-              out: task.fileName,
-            },
-          ],
+          url: task.downloadUrl,
+          options: {
+            dir: task.dir,
+            out: task.fileName,
+          },
         })),
       )
     ).flat();
 
-    const statusMap = await aria2.tellStatus(gids);
+    const statusMap = await downloadEngine.tellStatus(gids);
 
     tasks.forEach((task, index) => {
       task.gid = gids[index];
@@ -223,20 +220,20 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
     });
   },
   pauseDownloadTask: async (gid) => {
-    await aria2.invoke('aria2.pause', gid);
+    await downloadEngine.pause(gid);
   },
   pauseAllDownloadTask: async () => {
-    await aria2.invoke('aria2.pauseAll');
+    await downloadEngine.pauseAll();
   },
   unpauseDownloadTask: async (gid) => {
-    await aria2.invoke('aria2.unpause', gid);
+    await downloadEngine.unpause(gid);
   },
   unpauseAllDownloadTask: async () => {
-    await aria2.invoke('aria2.unpauseAll');
+    await downloadEngine.unpauseAll();
   },
   removeDownloadTask: async (gid) => {
-    aria2.invoke('aria2.remove', gid).catch((err) => {
-      log().warn('Remove aria2 task failed', { gid, err });
+    downloadEngine.remove(gid).catch((err) => {
+      log().warn('Remove download task failed', { gid, err });
     });
     const state = get();
     set({
@@ -249,16 +246,9 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
     });
   },
   batchRemoveDownloadTasks: async (gids) => {
-    aria2
-      .batchInvoke(
-        gids.map((gid) => ({
-          methodName: 'aria2.remove',
-          params: [gid],
-        })),
-      )
-      .catch((err) => {
-        log().error({ gids, err });
-      });
+    downloadEngine.batchRemove(gids).catch((err) => {
+      log().error({ gids, err });
+    });
     set({
       downloadTasks: R.filter((v: DownloadTask) => !gids.includes(v.gid))(
         get().downloadTasks,
@@ -300,12 +290,12 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
     }
     const task = downloadTasks[index];
     const now = Date.now();
-    const status = await aria2.tellStatus(gid);
+    const status = await downloadEngine.tellStatus(gid);
 
     if (status.status === 'error') {
-      if (task.ariaRetryCountRemains > 0) {
+      if (task.downloadRetryCountRemains > 0) {
         log().warn(
-          `Task download failed, retry it. RetryCountRemains: ${task.ariaRetryCountRemains}`,
+          `Task download failed, retry it. RetryCountRemains: ${task.downloadRetryCountRemains}`,
           task,
         );
         removeDownloadTask(task.gid);
@@ -314,22 +304,22 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
           post: task.post,
           media: task.media,
         });
-        newTask.ariaRetryCountRemains = task.ariaRetryCountRemains - 1;
+        newTask.downloadRetryCountRemains = task.downloadRetryCountRemains - 1;
 
-        const gid = await aria2.invoke('aria2.addUri', [task.downloadUrl], {
+        const gid = await downloadEngine.addUri(task.downloadUrl, {
           dir: newTask.dir,
           out: newTask.fileName,
         });
         newTask.gid = gid;
 
-        const status = await aria2.tellStatus(task.gid);
+        const status = await downloadEngine.tellStatus(newTask.gid);
         newTask.status = status.status;
 
         set({
           downloadTasks: get().downloadTasks.concat(newTask),
         });
       } else {
-        const newTask = await mergeAriaStatusToDownloadTask(status, task);
+        const newTask = await mergeDownloadStatusToDownloadTask(status, task);
         const msg = '任务下载失败';
         const desc = `${newTask.fileName}\n${newTask.error || '未知原因'}`;
         log().error('Task download failed', newTask);
@@ -343,7 +333,7 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
         });
       }
     } else {
-      const newTask = await mergeAriaStatusToDownloadTask(status, task);
+      const newTask = await mergeDownloadStatusToDownloadTask(status, task);
       updateDownloadTask(newTask, now);
     }
   },
@@ -566,7 +556,7 @@ async function scheduleAutoSyncTasks() {
   }
 
   const now = Date.now();
-  const resultMap = await aria2.tellStatus(ids);
+  const resultMap = await downloadEngine.tellStatus(ids);
   const { downloadTasks, batchUpdateDownloadTasks } =
     useDownloadStore.getState();
   const newTasks = await Promise.all(
@@ -574,7 +564,7 @@ async function scheduleAutoSyncTasks() {
       // Do not update status after someone updated it during query
       if (oldTask.updatedAt > now) return oldTask;
       if (!resultMap[oldTask.gid]) return oldTask;
-      return mergeAriaStatusToDownloadTask(
+      return mergeDownloadStatusToDownloadTask(
         resultMap[oldTask.gid],
         oldTask,
         now,

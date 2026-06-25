@@ -103,7 +103,7 @@ function App() {
           <ul className="mt-10 grid text-center lg:text-left lg:grid-cols-2 gap-4 [&_h2]:font-bold [&_h2]:text-lg [&_h2]:mb-2 [&_li]:border-[1px] [&_li]:border-gray-300 [&_li]:p-4 [&_li]:rounded-md [&_li]:bg-white">
             <li>
               <h2>速度飞快</h2>
-              <p>基于 Aria2 进行下载，能充分利用带宽。</p>
+              <p>基于 Gopeed 下载引擎，支持高效稳定的任务下载。</p>
             </li>
             <li>
               <h2>下载过滤器</h2>
@@ -115,7 +115,9 @@ function App() {
             </li>
             <li>
               <h2>可配置文件名模板</h2>
-              <p>可使用各种变量（如用户名、发布日期等）来配置文件名、保存路径模板。</p>
+              <p>
+                可使用各种变量（如用户名、发布日期等）来配置文件名、保存路径模板。
+              </p>
             </li>
             <li>
               <h2>代理</h2>
@@ -146,9 +148,9 @@ function App() {
           {sponsors ? (
             <ul className="mt-8 flex flex-wrap justify-center">
               {sponsors.list.map((item: any) => (
-                <li key={item.id} className='flex items-center mb-4 mx-2'>
+                <li key={item.id} className="flex items-center mb-4 mx-2">
                   <img src={item.avatar} className="w-6 h-6 rounded-full" />
-                  <span className='ml-1'>{item.name}</span>
+                  <span className="ml-1">{item.name}</span>
                 </li>
               ))}
             </ul>

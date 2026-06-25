@@ -2,14 +2,14 @@
 import React, { useEffect } from 'react';
 import { useDownloadStore } from '../../stores/download';
 import clsx from 'clsx';
-import { AriaStatus } from '../../utils/aria2';
+import { DownloadStatus } from '../../utils/downloader';
 import * as R from 'ramda';
 import { DownloadTask } from '../../interfaces/DownloadTask';
 
 export interface Tab {
   name: string;
   children: React.ReactNode;
-  countStatus: AriaStatus[];
+  countStatus: DownloadStatus[];
 }
 
 export interface TabsProps {
